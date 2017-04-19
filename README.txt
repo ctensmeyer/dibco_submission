@@ -1,0 +1,30 @@
+
+The basic usage of this code is as follow:
+python hdbico_submission.py in_image out_image
+
+If you wish to run the code on the GPU, you can do the following
+python hdbico_submission.py in_image out_image [#gpu]
+
+Where #gpu is the device ID of a CUDA enabled GPU, e.g. 0 for single GPU systems.
+
+As this submission consists of trained neural networks, there are two essential
+data files that must accompany the python file.  These two files are 'weights.caffemodel'
+and 'model.prototxt'.  The executable script is hdibco_submission.py
+
+
+Dependencies:
+
+The code is in python and relies on the following libraries:
+Caffe - For training and using Deep Convolutional Neural networks.  Installation
+	instructions can be found here: http://caffe.berkeleyvision.org/installation.html
+	The easiest system for building caffe is Ubuntu 14, as all of the dependencies
+	can be installed via the system package manager.
+	Installation of CUDA is optional, but recommended.  However, building the python bindings
+	is essential.
+	Caffe itself has a number of python module dependencies which must also be installed
+OpenCV - Again the python bindings are necessary.  I use the python-opencv package
+	on Ubuntu 14, though any recent version of open-cv should work as it is used just
+	for I/O.
+
+
+

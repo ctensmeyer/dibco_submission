@@ -1,0 +1,22 @@
+
+We employ a Fully Convolutional Network (FCN) [1] that takes a color image as input and outputs the probability that each pixel in the image is part of the foreground.  An FCN is a Convolutional Neural Network (CNN) composed only of many convolution layers (no fully connected layers).  As such, the FCN can take as input any sized image and return an appropriately sized output.  In this work, the FCN uses no downsampling and zero-padded convolution, so the output image is the same size as the input image.  
+
+Binarization can be viewed as a pixel-wise classification problem with two classes: foreground and background.  The FCN is trained using input/output image pairs. The input is a 3-channel 256x256 RGB image.  A single channel grayscale image can be converted to this format by copying the gray channel into each of the 3 RBG channels.  The output is a single channel 256x256 image encoding per-pixel probabilities of foreground.  The target output image is a binary image where foreground pixels have value 0 and background pixels have value 1.  The loss function is the sume of the per-pixel cross-entropy between the predicted and target distribution.
+
+The architecture is composed of 6 convolution layers.  Each convolution layer, except the last, has 16 learned kernels and is followed by Batch Normalization [2] and element-wise ReLU activation.  The middle 4 layers also have residual connections [3].  The last convolution layer has a single kernel and uses an element-wise sigmoid operation to transform output values into proper probabilities.  All kernels are square and their sizes (first to last) are 15, 11, 7, 7, 7, 1.  
+
+It takes a large number of images to train an FCN, far more than the 50 images provided by the competition.  It is common for CNNs (and FCNs) to be first trained on an auxilliary task (e.g. ImageNet), and then finetuned on the task of interest.  We pretrain our FCN using English and German  handwritten parish records from the 1800s.  The corresponding "ground truth" binarization is automatically generated using the binarization method of Wolf et al. [4].  While these target output binarizations do contain noise, they provide a good starting point for the FCN weights.  
+
+We finetune using the curated ground truth image pairs used in all previous DIBCO and HDIBCO competitions.  This helps the FCN not make the same errors that the Wolf et al. binarization method does.  
+
+For inference, the binarization is accomplished by a single forward pass through the network and thresholding the probabilities (at 50%).  For memory efficiency, the image is fragmented into subimages, which are independently fed into the network and then reassembled into the output image.
+
+
+Citations:
+[1] Long, Jonathan, Evan Shelhamer, and Trevor Darrell. "Fully convolutional networks for semantic segmentation." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2015.
+
+[2] Ioffe, Sergey, and Christian Szegedy. "Batch normalization: Accelerating deep network training by reducing internal covariate shift." arXiv preprint arXiv:1502.03167 (2015).
+
+[3] He, Kaiming, et al. "Deep Residual Learning for Image Recognition." arXiv preprint arXiv:1512.03385 (2015).
+
+[4] Christian Wolf , Jean-Michel Jolion and Francoise Chassaing. Text Localization, Enhancement and Binarization in Multimedia Documents Proceedings of the International Conference on Pattern Recognition (ICPR), volume 4, pages 1037-1040, IEEE Computer Society. August 11th-15th, 2002, Quebec City, Canada. 4 pages.
