@@ -5,6 +5,7 @@ import sys
 import numpy as np
 import caffe
 import cv2
+import matlab.engine
 
 
 # acceptable image suffixes
@@ -27,23 +28,42 @@ MIDDLE = 0
 RIGHT_EDGE = 1
 BOTTOM_EDGE = 2
 
+def howes_binarization(img):
+	im_mat = matlab.uint8(img[:,:,::-1].tolist())
+
+	# eng declared in main()
+	result_mat = eng.binarizeImage(im_mat)
+	result_np = np.array(result_mat._data.tolist(), dtype='uint8')
+	result_np = result_np.reshape(result_mat.size[1], result_mat.size[0]).transpose()
+
+	# Returns an array of values 0 and 1
+	return result_np
+
 
 def setup_network():
 	network = caffe.Net(NET_FILE, WEIGHTS_FILE, caffe.TEST)
 	return network
 
 
-def fprop(network, ims, batchsize=BATCH_SIZE):
+def fprop(network, ims, howes_ims, batchsize=BATCH_SIZE):
 	# batch up all transforms at once
 	idx = 0
 	responses = list()
 	while idx < len(ims):
 		sub_ims = ims[idx:idx+batchsize]
-		network.blobs["data"].reshape(len(sub_ims), 3, ims[0].shape[1], ims[0].shape[0]) 
-		for x, im in enumerate(sub_ims):
-			transposed = np.transpose(im, [2,0,1])
+		sub_howes_ims = ims[idx:idx+batchsize]
+
+		network.blobs["data"].reshape(len(sub_ims), 3, ims[0].shape[1], ims[0].shape[0])
+		network.blobs["howes_data"].reshape(len(sub_howes_ims), 3, ims[0].shape[1], ims[0].shape[0])
+
+		for x in range(len(sub_ims)):
+			transposed = np.transpose(sub_ims[x], [2,0,1])
 			transposed = transposed[np.newaxis, :, :, :]
 			network.blobs["data"].data[x,:,:,:] = transposed
+
+			transposed_howe = np.transpose(sub_howes_ims[x], [2,0,1])
+			transposed_howe = transposed_howe[np.newaxis, :, :, :]
+			network.blobs["howes_data"].data[x,:,:,:] = transposed_howe
 		idx += batchsize
 
 		# propagate on batch
@@ -54,8 +74,8 @@ def fprop(network, ims, batchsize=BATCH_SIZE):
 	return np.concatenate(responses, axis=0)
 
 
-def predict(network, ims):
-	all_outputs = fprop(network, ims)
+def predict(network, ims, howes_ims):
+	all_outputs = fprop(network, ims, howes_ims)
 	predictions = np.argmax(all_outputs, axis=1)
 	return predictions
 
@@ -67,6 +87,7 @@ def get_subwindows(im):
 		print "Invalid crop: crop dims larger than image (%r with %r)" % (im.shape, tokens)
 		exit(1)
 	ims = list()
+	bin_ims = list()
 	locations = list()
 	y = 0
 	y_done = False
@@ -89,7 +110,10 @@ def get_subwindows(im):
 			x += x_stride
 		y += y_stride
 
-	return locations, ims
+	for im in ims:
+		bin_ims.append(howes_binarization(im))
+
+	return locations, ims, bin_ims
 
 
 def stich_together(locations, subwindows, size):
@@ -133,12 +157,14 @@ def stich_together(locations, subwindows, size):
 	
 
 def main(in_image, out_image):
+	global eng = matlab.engine.start_matlab()
+
 	image = cv2.imread(in_image, cv2.IMREAD_COLOR)
 	image = 0.0039 * (image - 127.)
 
 	network = setup_network()
-	locations, subwindows = get_subwindows(image)
-	binarized_subwindows = predict(network, subwindows)
+	locations, subwindows, howes_subwindows = get_subwindows(image)
+	binarized_subwindows = predict(network, subwindows, howes_subwindows)
 	
 	result = stich_together(locations, binarized_subwindows, tuple(image.shape[0:2]))
 	result = 255 * result
