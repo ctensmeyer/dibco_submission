@@ -10,7 +10,6 @@ layer {
   name: "conv1"
   type: "Convolution"
   bottom: "data"
-  bottom: "howes_data"
   top: "conv1"
   param {
     lr_mult: 1
